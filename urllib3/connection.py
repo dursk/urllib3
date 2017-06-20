@@ -129,6 +129,7 @@ class HTTPConnection(_HTTPConnection, object):
 
         :return: New socket connection.
         """
+        print('---> http _new_conn')
         extra_kw = {}
         if self.source_address:
             extra_kw['source_address'] = self.source_address
@@ -137,8 +138,10 @@ class HTTPConnection(_HTTPConnection, object):
             extra_kw['socket_options'] = self.socket_options
 
         try:
+            print('create_connection')
             conn = connection.create_connection(
                 (self.host, self.port), self.timeout, **extra_kw)
+            print('done create_connection')
 
         except SocketTimeout as e:
             raise ConnectTimeoutError(
@@ -148,10 +151,11 @@ class HTTPConnection(_HTTPConnection, object):
         except SocketError as e:
             raise NewConnectionError(
                 self, "Failed to establish a new connection: %s" % e)
-
+        print('<--- http _new_conn')
         return conn
 
     def _prepare_conn(self, conn):
+        print('---> http _prepare_conn')
         self.sock = conn
         # the _tunnel_host attribute was added in python 2.6.3 (via
         # http://hg.python.org/cpython/rev/0f57b30a152f) so pythons 2.6(0-2) do
@@ -161,6 +165,7 @@ class HTTPConnection(_HTTPConnection, object):
             self._tunnel()
             # Mark this connection as not reusable
             self.auto_open = 0
+        print('<--- http _prepare_conn')
 
     def connect(self):
         conn = self._new_conn()

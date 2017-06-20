@@ -31,7 +31,7 @@ except ImportError:
 
 __author__ = 'Andrey Petrov (andrey.petrov@shazow.net)'
 __license__ = 'MIT'
-__version__ = 'dev'
+__version__ = '1.21.1'
 
 __all__ = (
     'HTTPConnectionPool',

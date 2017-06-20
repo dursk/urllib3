@@ -223,6 +223,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
             :class:`urllib3.exceptions.EmptyPoolError` if the pool is empty and
             :prop:`.block` is ``True``.
         """
+        print('--> _get_conn')
         conn = None
         try:
             conn = self.pool.get(block=self.block, timeout=timeout)
@@ -247,7 +248,9 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
                 # attempt to bypass the proxy)
                 conn = None
 
-        return conn or self._new_conn()
+        x = conn or self._new_conn()
+        print('<-- _get_conn')
+        return x
 
     def _put_conn(self, conn):
         """
@@ -320,6 +323,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
 
     def _make_request(self, conn, method, url, timeout=_Default, chunked=False,
                       **httplib_request_kw):
+        print('--> _make_request')
         """
         Perform a request on a given urllib connection object taken from our
         pool.
@@ -336,30 +340,41 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
         """
         self.num_requests += 1
 
+        print('timeout init')
+        print('timeout: {}'.format(timeout))
         timeout_obj = self._get_timeout(timeout)
         timeout_obj.start_connect()
         conn.timeout = timeout_obj.connect_timeout
+        print('timout: {}'.format(conn.timeout))
+        print('end timeout init')
 
         # Trigger any extra validation we need to do.
         try:
+            print('validate conn')
             self._validate_conn(conn)
         except (SocketTimeout, BaseSSLError) as e:
+            print('exc validating cont')
             # Py2 raises this as a BaseSSLError, Py3 raises it as socket timeout.
             self._raise_timeout(err=e, url=url, timeout_value=conn.timeout)
             raise
+        print('validated conn')
 
         # conn.request() calls httplib.*.request, not the method in
         # urllib3.request. It also calls makefile (recv) on the socket.
         if chunked:
+            print('chunked')
             conn.request_chunked(method, url, **httplib_request_kw)
         else:
+            print('not chunked')
             conn.request(method, url, **httplib_request_kw)
 
         # Reset the timeout for the recv() on the socket
         read_timeout = timeout_obj.read_timeout
+        print('read timeout')
 
         # App Engine doesn't have a sock attr
         if getattr(conn, 'sock', None):
+            print('sock')
             # In Python 3 socket.py will catch EAGAIN and return None when you
             # try and read into the file pointer created by http.client, which
             # instead raises a BadStatusLine exception. Instead of catching
@@ -376,16 +391,22 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
         # Receive the response from the server
         try:
             try:  # Python 2.7, use buffering of HTTP responses
+                print('getting response')
                 httplib_response = conn.getresponse(buffering=True)
+                print('got response')
             except TypeError:  # Python 2.6 and older, Python 3
                 try:
+                    print('py3')
                     httplib_response = conn.getresponse()
                 except Exception as e:
+                    print('exc py3')
                     # Remove the TypeError from the exception chain in Python 3;
                     # otherwise it looks like a programming error was the cause.
                     six.raise_from(e, None)
         except (SocketTimeout, BaseSSLError, SocketError) as e:
+            print('big exc')
             self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+            print('after raise timeout')
             raise
 
         # AppEngine doesn't have a version attr.
@@ -401,6 +422,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
                 'Failed to parse headers (url=%s): %s',
                 self._absolute_url(url), hpe, exc_info=True)
 
+        print('<-- _make_request')
         return httplib_response
 
     def _absolute_url(self, path):
@@ -768,7 +790,7 @@ class HTTPSConnectionPool(HTTPConnectionPool):
         Prepare the ``connection`` for :meth:`urllib3.util.ssl_wrap_socket`
         and establish the tunnel if proxy is used.
         """
-
+        print('--> _prepate_conn')
         if isinstance(conn, VerifiedHTTPSConnection):
             conn.set_cert(key_file=self.key_file,
                           cert_file=self.cert_file,
@@ -778,6 +800,7 @@ class HTTPSConnectionPool(HTTPConnectionPool):
                           assert_hostname=self.assert_hostname,
                           assert_fingerprint=self.assert_fingerprint)
             conn.ssl_version = self.ssl_version
+        print('<-- _prepate_conn')
         return conn
 
     def _prepare_proxy(self, conn):
@@ -802,6 +825,7 @@ class HTTPSConnectionPool(HTTPConnectionPool):
         """
         Return a fresh :class:`httplib.HTTPSConnection`.
         """
+        print('--> _new_conn')
         self.num_connections += 1
         log.debug("Starting new HTTPS connection (%d): %s",
                   self.num_connections, self.host)
@@ -820,25 +844,31 @@ class HTTPSConnectionPool(HTTPConnectionPool):
                                   timeout=self.timeout.connect_timeout,
                                   strict=self.strict, **self.conn_kw)
 
-        return self._prepare_conn(conn)
+        x = self._prepare_conn(conn)
+        print('<-- _new_conn')
+        return x
 
     def _validate_conn(self, conn):
         """
         Called right before a request is made, after the socket is created.
         """
+        print('--> _validate_conn')
         super(HTTPSConnectionPool, self)._validate_conn(conn)
 
         # Force connect early to allow us to validate the connection.
         if not getattr(conn, 'sock', None):  # AppEngine might not have  `.sock`
+            print('connecting')
             conn.connect()
 
         if not conn.is_verified:
+            print('not verified')
             warnings.warn((
                 'Unverified HTTPS request is being made. '
                 'Adding certificate verification is strongly advised. See: '
                 'https://urllib3.readthedocs.io/en/latest/advanced-usage.html'
                 '#ssl-warnings'),
                 InsecureRequestWarning)
+        print('<-- _validate_conn')
 
 
 def connection_from_url(url, **kw):

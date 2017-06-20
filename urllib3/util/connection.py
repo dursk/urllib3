@@ -46,42 +46,52 @@ def create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
     for the socket to bind as a source address before making the connection.
     An host of '' or port 0 tells the OS to use the default.
     """
-
+    print('--> create_connection')
     host, port = address
     if host.startswith('['):
         host = host.strip('[]')
     err = None
-
+    print('parsed things')
     # Using the value from allowed_gai_family() in the context of getaddrinfo lets
     # us select whether to work with IPv4 DNS records, IPv6 records, or both.
     # The original create_connection function always returns all records.
     family = allowed_gai_family()
-
+    print('family')
+    socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+    print('getaddrinfo')
     for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
+        print('in loop')
         af, socktype, proto, canonname, sa = res
         sock = None
         try:
+            print('creating socket')
             sock = socket.socket(af, socktype, proto)
 
             # If provided, set socket level options before connecting.
             _set_socket_options(sock, socket_options)
 
             if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                print('settimeout')
                 sock.settimeout(timeout)
             if source_address:
+                print('binding')
                 sock.bind(source_address)
+            print('about to sock.connect')
             sock.connect(sa)
+            print('returning sock')
             return sock
 
         except socket.error as e:
+            print('socket error')
             err = e
             if sock is not None:
                 sock.close()
                 sock = None
-
+    print('afterloop')
     if err is not None:
         raise err
 
+    print('<-- create_connection')
     raise socket.error("getaddrinfo returns an empty list")
 
 
